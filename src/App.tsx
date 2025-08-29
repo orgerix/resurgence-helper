@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { JSX, useCallback, useEffect, useState } from 'react'
 import  {Item, loadRelics, Rarity, Relic, RelicReward} from './Types.ts'
 import computeProbabilities from './Math.ts'
 import './App.css'
@@ -27,7 +27,7 @@ function toColor(rarity: Rarity) {
 
 class RelicGridProps {
   relic: Relic
-  changeHandler: (relicName: string, rewards: [Item, number][], amount: number) => void | undefined
+  changeHandler: (relicName: string, rewards: [Item, number][]) => void
 }
 
 function RelicGrid(props: RelicGridProps) {
@@ -42,12 +42,14 @@ function RelicGrid(props: RelicGridProps) {
     
     const probas = runMethod === "" ? undefined : computeProbabilities(runMethod, rewards)
 
-    if (probas !== undefined && props.changeHandler !== undefined) {
-      const parsed = parseInt(amount)
-      if (!Number.isNaN(parsed)) {
-          props.changeHandler(props.relic.name, rewards.map((r, i) => [r.item, probas[i]]), parsed);
+    useEffect(() => {
+      if (probas !== undefined && props.changeHandler !== undefined) {
+        const parsed = parseInt(amount)
+        if (!Number.isNaN(parsed)) {
+          props.changeHandler(props.relic.name, rewards.map((r, i) => [r.item, probas[i] * parsed]));
+        }
       }
-    }
+    }, [amount, runMethod, positions]);
   
     return (<div>
         Amount: <TextField value={amount} onChange={(event: React.ChangeEvent<HTMLInputElement>) => { setAmount(event.target.value); }}></TextField>
@@ -72,7 +74,7 @@ function RelicGrid(props: RelicGridProps) {
           <TableBody>
             {rewards.map((reward, i) => (
               <TableRow
-                key={reward.item.name}
+                key={reward.item.id}
                 sx={{ "backgroundColor": toColor(reward.rarity) }}
               >
                 <TableCell component="th" scope="row">
@@ -91,7 +93,6 @@ function RelicGrid(props: RelicGridProps) {
   function createPriorityChangeHandler(reward: RelicReward) {
     return (event) => {
       const parsed = parseInt(event.target.value);
-      console.log(parsed);
       if (Number.isNaN(parsed)) {
         return;
       }
@@ -106,7 +107,7 @@ function RelicGrid(props: RelicGridProps) {
 
 class RelicTabsProps {
   relics: Relic[]
-  changeHandler: (relicName: string, rewards: [Item, number][], amount: number) => void | undefined
+  changeHandler: (relicName: string, rewards: [Item, number][]) => void
 }
 
 function RelicTabs(props: RelicTabsProps) {
@@ -122,7 +123,7 @@ function RelicTabs(props: RelicTabsProps) {
   };
 
   const tabs = props.relics.map(relic => (<Tab label={relic.name} value={relic.name} />));
-  const tabPanel = props.relics.map(relic => (<TabPanel value={relic.name}><RelicGrid relic={relic} changeHandler={props.changeHandler} /></TabPanel>));
+  const tabPanel = props.relics.map(relic => (<TabPanel key={relic.name} value={relic.name}><RelicGrid relic={relic} changeHandler={props.changeHandler} /></TabPanel>));
 
   return (<Box>
         <TabContext value={value}>
@@ -136,23 +137,80 @@ function RelicTabs(props: RelicTabsProps) {
       </Box>);
 }
 
+class RecapProps {
+  data: Map<string, [Item, number][]>
+}
+
+function Recap(props: RecapProps) {
+  const perSet = new Map<string, Map<String, number>>();
+
+  props.data.forEach((value) => {
+    value.forEach(elem => {
+      if (elem[0].set === undefined) {
+        return;
+      }
+      let map = perSet.get(elem[0].set);
+      if (map === undefined) {
+        map = new Map<String, number>();
+        perSet.set(elem[0].set, map);
+      }
+      const count = map.get(elem[0].name) || 0;
+      map.set(elem[0].name, count + elem[1]);
+    })
+  });
+
+  const setRows: JSX.Element[] = []
+  perSet.forEach((items, setName) => {
+    const itemRows: JSX.Element[] = []
+    items.forEach((number, itemName) => {
+      itemRows.push((
+        <TableRow>
+          <TableCell>{itemName}</TableCell>
+          <TableCell align="right">{number.toLocaleString(undefined, { maximumFractionDigits: 1 })}</TableCell>
+        </TableRow>
+      ))
+    })
+    setRows.push((
+      <TableRow key={setName}>
+        <TableCell>{setName}</TableCell><TableCell><Table><TableBody>{itemRows}</TableBody></Table></TableCell>
+      </TableRow>))
+          });
+
+  return (
+    <Box>
+      <Table sx={{ minWidth: 650 }} size="small" aria-label="a dense table">
+        <TableHead>
+          <TableRow>
+            <TableCell>Set</TableCell>
+            <TableCell>Parts</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {setRows}
+        </TableBody>
+      </Table>
+    </Box>);
+}
 
 function App() {
   const [state, setState] = useState(new Map<string, Relic>);
   const selected: Relic[] = []
   const [relics, setRelics] = useState(selected);
-  const [gatheredData, setGatheredData] = useState(new Map<string, [[Item, number][], number]>)
+  const [gatheredData, setGatheredData] = useState(new Map<string, [Item, number][]>)
   useEffect(() => {
       async function loadData() {
         const relics = await loadRelics();
-        console.log(relics.size);
         setState(relics);
       }
       loadData()
     }, [])
   const autoCompleteOptions = [... state.values()]
 
-  console.log(gatheredData);
+  const filteredData: Map<string, [Item, number][]> = new Map<string, [Item, number][]>(relics.map(relic =>  [relic.name, gatheredData.get(relic.name) ?? []]))
+
+  console.log("selected", selected);
+  console.log("gathered", gatheredData);
+  console.log("filtered", filteredData);
 
   return (
     <div>
@@ -166,12 +224,15 @@ function App() {
         renderInput={(params) => <TextField {...params} label="Relic" />}
         onChange={(event, values) => setRelics(values)}
       />
-      <RelicTabs relics={relics} changeHandler={(e, r, v) => console.log(e,r,v)
-      /*setGatheredData(oldState => {
-        const newState = new Map<string, [[Item, number][], number]>(oldState);
-        newState.set(e, [r, v]);
-        return newState;
-      })*/} />
+      <RelicTabs relics={relics} changeHandler={(e, r) => {
+        console.log(e,r);
+        setGatheredData(oldState => {
+          const newState = new Map<string, [Item, number][]>(oldState);
+          newState.set(e, r);
+          return newState;
+        });
+      }} />
+      <Recap data={filteredData} />
     </div>
   )
 }
