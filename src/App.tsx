@@ -206,12 +206,6 @@ function App() {
     }, [])
   const autoCompleteOptions = [... state.values()]
 
-  const filteredData: Map<string, [Item, number][]> = new Map<string, [Item, number][]>(relics.map(relic =>  [relic.name, gatheredData.get(relic.name) ?? []]))
-
-  console.log("selected", selected);
-  console.log("gathered", gatheredData);
-  console.log("filtered", filteredData);
-
   return (
     <div>
       <Autocomplete
@@ -222,7 +216,16 @@ function App() {
         groupBy={(option) => option.era.toString()}
         sx={{ width: 300 }}
         renderInput={(params) => <TextField {...params} label="Relic" />}
-        onChange={(event, values) => setRelics(values)}
+        onChange={(event, values) => {
+          setRelics(values);
+          setGatheredData(oldData => {
+            const newData = new Map<string, [Item, number][]>();
+            values.forEach(relic => {
+              newData.set(relic.name, oldData.get(relic.name) ?? [])
+            });
+            return newData;
+          })
+        }}
       />
       <RelicTabs relics={relics} changeHandler={(e, r) => {
         console.log(e,r);
@@ -232,7 +235,7 @@ function App() {
           return newState;
         });
       }} />
-      <Recap data={filteredData} />
+      <Recap data={gatheredData} />
     </div>
   )
 }
