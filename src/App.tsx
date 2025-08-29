@@ -72,7 +72,7 @@ function RelicGrid(props: RelicGridProps) {
                   {reward.item.name}
                 </TableCell>
                 <TableCell align="right">{reward.item.set}</TableCell>
-                <TableCell align="right"><TextField  value={indexedPosition.get(reward.item.id)} onChange={ (event) => setPositions(positions.map(e => e[0] === reward.item.id ? [e[0], parseInt(event.target.value)] : [e[0], e[1]])) }></TextField></TableCell>
+                <TableCell align="right"><TextField  value={indexedPosition.get(reward.item.id)} onChange={ createPriorityChangeHandler(reward) }></TextField></TableCell>
                 <TableCell align="right">{probas !== undefined && probas[i].toLocaleString(undefined, { maximumFractionDigits: 3 })}</TableCell>
               </TableRow>
             ))}
@@ -80,6 +80,17 @@ function RelicGrid(props: RelicGridProps) {
         </Table>
       </TableContainer>
     </div>);
+
+  function createPriorityChangeHandler(reward: RelicReward) {
+    return (event) => {
+      const parsed = parseInt(event.target.value);
+      console.log(parsed);
+      if (Number.isNaN(parsed)) {
+        return;
+      }
+      setPositions(positions.map(e => e[0] === reward.item.id ? [e[0], parseInt(event.target.value)] : [e[0], e[1]]))
+    }
+  }
 }
 
 function RelicTabs({relics}) {
