@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import  {loadRelics, Rarity, Relic, RelicReward} from './Types.ts'
+import  {Item, loadRelics, Rarity, Relic, RelicReward} from './Types.ts'
 import computeProbabilities from './Math.ts'
 import './App.css'
 import Autocomplete from '@mui/material/Autocomplete'
@@ -27,23 +27,30 @@ function toColor(rarity: Rarity) {
 
 class RelicGridProps {
   relic: Relic
+  changeHandler: (relicName: string, rewards: [Item, number][], amount: number) => void | undefined
 }
 
 function RelicGrid(props: RelicGridProps) {
     const [runMethod, setRunMethod] = useState('');
-    const [positions, setPositions] = useState<[string, number][]>(props.relic.rewards.map((r, i) => [r.item.id, i]))
+    const [amount, setAmount] = useState("1");
+    const [positions, setPositions] = useState(new Map(props.relic.rewards.map((r, i) => [r.item.id, i])));
     const handleRunChange = (event: SelectChangeEvent) => {
       setRunMethod(event.target.value as string);
     };
 
-    const indexedPosition = new Map<string, number>(positions.map(e => e))
-
-    const rewards = [...props.relic.rewards].sort((a,b) => (indexedPosition.get(a.item.id) ?? 0) - (indexedPosition.get(b.item.id) ?? 0))
+    const rewards = [...props.relic.rewards].sort((a,b) => (positions.get(a.item.id) ?? 0) - (positions.get(b.item.id) ?? 0))
     
     const probas = runMethod === "" ? undefined : computeProbabilities(runMethod, rewards)
 
+    if (probas !== undefined && props.changeHandler !== undefined) {
+      const parsed = parseInt(amount)
+      if (!Number.isNaN(parsed)) {
+          props.changeHandler(props.relic.name, rewards.map((r, i) => [r.item, probas[i]]), parsed);
+      }
+    }
+  
     return (<div>
-        Amount: <TextField></TextField>
+        Amount: <TextField value={amount} onChange={(event: React.ChangeEvent<HTMLInputElement>) => { setAmount(event.target.value); }}></TextField>
         Run method: <Select autoWidth value={runMethod} onChange={handleRunChange}>
           <MenuItem value="2b2i">2b2i</MenuItem>
           <MenuItem value="4b4i">4b4i</MenuItem>
@@ -72,7 +79,7 @@ function RelicGrid(props: RelicGridProps) {
                   {reward.item.name}
                 </TableCell>
                 <TableCell align="right">{reward.item.set}</TableCell>
-                <TableCell align="right"><TextField  value={indexedPosition.get(reward.item.id)} onChange={ createPriorityChangeHandler(reward) }></TextField></TableCell>
+                <TableCell align="right"><TextField  value={positions.get(reward.item.id)} onChange={ createPriorityChangeHandler(reward) }></TextField></TableCell>
                 <TableCell align="right">{probas !== undefined && probas[i].toLocaleString(undefined, { maximumFractionDigits: 3 })}</TableCell>
               </TableRow>
             ))}
@@ -88,25 +95,34 @@ function RelicGrid(props: RelicGridProps) {
       if (Number.isNaN(parsed)) {
         return;
       }
-      setPositions(positions.map(e => e[0] === reward.item.id ? [e[0], parseInt(event.target.value)] : [e[0], e[1]]))
+      setPositions((oldValues) => {
+        const newValues = new Map(oldValues);
+        newValues.set(reward.item.id, parsed);
+        return newValues;
+      });
     }
   }
 }
 
-function RelicTabs({relics}) {
+class RelicTabsProps {
+  relics: Relic[]
+  changeHandler: (relicName: string, rewards: [Item, number][], amount: number) => void | undefined
+}
 
-  if (relics.length == 0) {
+function RelicTabs(props: RelicTabsProps) {
+
+  if (props.relics.length == 0) {
     return <Box></Box>;
   }
 
-  const [value, setValue] = useState(relics[0].name);
+  const [value, setValue] = useState(props.relics[0].name);
 
   const handleChange = (event: React.SyntheticEvent, newValue: string) => {
     setValue(newValue);
   };
 
-  const tabs = relics.map(relic => (<Tab label={relic.name} value={relic.name} />));
-  const tabPanel = relics.map(relic => (<TabPanel value={relic.name}><RelicGrid relic={relic} /></TabPanel>));
+  const tabs = props.relics.map(relic => (<Tab label={relic.name} value={relic.name} />));
+  const tabPanel = props.relics.map(relic => (<TabPanel value={relic.name}><RelicGrid relic={relic} changeHandler={props.changeHandler} /></TabPanel>));
 
   return (<Box>
         <TabContext value={value}>
@@ -125,6 +141,7 @@ function App() {
   const [state, setState] = useState(new Map<string, Relic>);
   const selected: Relic[] = []
   const [relics, setRelics] = useState(selected);
+  const [gatheredData, setGatheredData] = useState(new Map<string, [[Item, number][], number]>)
   useEffect(() => {
       async function loadData() {
         const relics = await loadRelics();
@@ -135,7 +152,7 @@ function App() {
     }, [])
   const autoCompleteOptions = [... state.values()]
 
-  let i = 1
+  console.log(gatheredData);
 
   return (
     <div>
@@ -149,7 +166,12 @@ function App() {
         renderInput={(params) => <TextField {...params} label="Relic" />}
         onChange={(event, values) => setRelics(values)}
       />
-      <RelicTabs relics={relics}/>
+      <RelicTabs relics={relics} changeHandler={(e, r, v) => console.log(e,r,v)
+      /*setGatheredData(oldState => {
+        const newState = new Map<string, [[Item, number][], number]>(oldState);
+        newState.set(e, [r, v]);
+        return newState;
+      })*/} />
     </div>
   )
 }
