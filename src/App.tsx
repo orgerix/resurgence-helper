@@ -10,7 +10,7 @@ import TabContext from '@mui/lab/TabContext';
 import TabList from '@mui/lab/TabList';
 import TabPanel from '@mui/lab/TabPanel';
 
-import { Input, MenuItem, Paper, Select, SelectChangeEvent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material'
+import { Button, Checkbox, Input, MenuItem, Paper, Select, SelectChangeEvent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material'
 
 function toColor(rarity: Rarity) {
   switch (rarity) {
@@ -34,13 +34,17 @@ function RelicGrid(props: RelicGridProps) {
     const [runMethod, setRunMethod] = useState('');
     const [amount, setAmount] = useState("1");
     const [positions, setPositions] = useState(new Map(props.relic.rewards.map((r, i) => [r.item.id, i])));
+    const [offcycle, setOffcycle] = useState("");
     const handleRunChange = (event: SelectChangeEvent) => {
       setRunMethod(event.target.value as string);
+      if (runMethod.startsWith("4b4")) {
+        setOffcycle("");
+      }
     };
 
     const rewards = [...props.relic.rewards].sort((a,b) => (positions.get(a.item.id) ?? 0) - (positions.get(b.item.id) ?? 0))
     
-    const probas = runMethod === "" ? undefined : computeProbabilities(runMethod, rewards)
+    const probas = runMethod === "" ? undefined : computeProbabilities(runMethod, rewards, offcycle)
 
     useEffect(() => {
       if (probas !== undefined && props.changeHandler !== undefined) {
@@ -61,6 +65,10 @@ function RelicGrid(props: RelicGridProps) {
           <MenuItem value="2b2r">2b2r</MenuItem>
           <MenuItem value="4b4r">4b4r</MenuItem>
         </Select>
+        { !runMethod.startsWith("4b4") &&
+        (<span>Favor offcycle gold before: <Select value={offcycle} onChange={(event: SelectChangeEvent) => { setOffcycle(event.target.value); }} autoWidth>
+          {rewards.map(r => (<MenuItem value={r.item.id}>{r.item.name}</MenuItem>))}
+        </Select></span>)}
         <TableContainer component={Paper}>
         <Table sx={{ minWidth: 650 }} size="small" aria-label="a dense table">
           <TableHead>

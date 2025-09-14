@@ -65,7 +65,8 @@ function parseRunMethod(runMethod: string): Run {
 }
 
 
-function computeProbabilities(runMethod: string, rewards: RelicReward[]): number[] {
+function computeProbabilities(runMethod: string, rewards: RelicReward[], offcycle: string): number[] {
+    console.log("offycle", offcycle);
     const run = parseRunMethod(runMethod);
     const proba = probabilities.get(run.refinement);
     if (proba === undefined) {
@@ -75,14 +76,17 @@ function computeProbabilities(runMethod: string, rewards: RelicReward[]): number
     const result: number[] = [];
     let cumulatedProba = 0;
     let cumulatedCompositeProba = 0;
+    let handleOffcycle = false;
     for (let i=0; i<rewards.length; i++) {
+        handleOffcycle = handleOffcycle || (offcycle === rewards[i].item.id);
+        console.log("reward", rewards[i].item.id, handleOffcycle);
         const singleProbability = proba.get(rewards[i].rarity);
         if (singleProbability === undefined) {
             console.log("Undefined proba", proba, rewards[i].rarity);
             throw "Error";
         }
         const compositeProbability = 1-(1-singleProbability - cumulatedProba)**run.runMethod.relicsPerRun - cumulatedCompositeProba;
-        result.push(compositeProbability);
+        result.push(compositeProbability*(handleOffcycle ? 0.98*0.98 : 1));
         cumulatedProba += singleProbability;
         cumulatedCompositeProba += compositeProbability;
     }  
