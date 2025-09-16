@@ -107,7 +107,7 @@ class DataParser {
 }
 
 async  function loadRelics(): Promise<Map<string, Relic>> {
-    const response = await fetch("https://api.warframestat.us/items/search/Relics/?by=category")
+    const response = await fetch("https://api.warframestat.us/items/search/Relics/?by=category&language=en")
     const json = await response.json();
     return new DataParser().parse(json);
 }
