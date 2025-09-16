@@ -27,12 +27,12 @@ function toColor(rarity: Rarity) {
 }
 
 class RelicGridProps {
-  relic: Relic
-  changeHandler: (relicName: string, rewards: [Item, number][]) => void
+  relicState: RelicState
+  changeHandler: (relic: RelicState, rewards: [Item, number][]) => void
 }
 
 function RelicGrid(props: RelicGridProps) {
-    const [state, setState] = useState(new RelicState(props.relic))
+    const [state, setState] = useState(props.relicState)
     const handleRunChange = (event: SelectChangeEvent) => {
       setState(old => {
         const newState = {... old}
@@ -56,14 +56,14 @@ function RelicGrid(props: RelicGridProps) {
         return newState;
     });}
 
-    const rewards = [...props.relic.rewards].sort((a,b) => (state.positions.get(a.item.id) ?? 0) - (state.positions.get(b.item.id) ?? 0))
+    const rewards = [...props.relicState.relic.rewards].sort((a,b) => (state.positions.get(a.item.id) ?? 0) - (state.positions.get(b.item.id) ?? 0))
     
     const probas = state.run === undefined ? undefined : computeProbabilities(state.run, rewards, state.offcycle)
 
     useEffect(() => {
       if (probas !== undefined && props.changeHandler !== undefined) {
         if (!Number.isNaN(state.amount)) {
-          props.changeHandler(props.relic.name, rewards.map((r, i) => [r.item, probas[i] * (state.amount ?? 1)]));
+          props.changeHandler(state, rewards.map((r, i) => [r.item, probas[i] * (state.amount ?? 1)]));
         }
       }
     }, [state]);
@@ -128,24 +128,24 @@ function RelicGrid(props: RelicGridProps) {
 }
 
 class RelicTabsProps {
-  relics: Relic[]
-  changeHandler: (relicName: string, rewards: [Item, number][]) => void
+  relicStates: RelicState[]
+  changeHandler: (relicState: RelicState, rewards: [Item, number][]) => void
 }
 
 function RelicTabs(props: RelicTabsProps) {
 
-  if (props.relics.length == 0) {
+  if (props.relicStates.length == 0) {
     return <Box></Box>;
   }
 
-  const [value, setValue] = useState(props.relics[0].name);
+  const [value, setValue] = useState(props.relicStates[0].relic.name);
 
   const handleChange = (event: React.SyntheticEvent, newValue: string) => {
     setValue(newValue);
   };
 
-  const tabs = props.relics.map(relic => (<Tab label={relic.name} value={relic.name} />));
-  const tabPanel = props.relics.map(relic => (<TabPanel key={relic.name} value={relic.name}><RelicGrid relic={relic} changeHandler={props.changeHandler} /></TabPanel>));
+  const tabs = props.relicStates.map(state => (<Tab label={state.relic.name} value={state.relic.name} />));
+  const tabPanel = props.relicStates.map(state => (<TabPanel key={state.relic.name} value={state.relic.name}><RelicGrid relicState={state} changeHandler={props.changeHandler} /></TabPanel>));
 
   return (<Box>
         <TabContext value={value}>
@@ -215,19 +215,17 @@ function Recap(props: RecapProps) {
 }
 
 function App() {
-  const [state, setState] = useState(new Map<string, Relic>);
-  const selected: Relic[] = []
-  const [relics, setRelics] = useState(selected);
+  const [allRelics, setAllRelics] = useState(new Map<string, Relic>);
+  const [relics, setRelics] = useState(new Map<string, RelicState>);
   const [gatheredData, setGatheredData] = useState(new Map<string, [Item, number][]>)
   useEffect(() => {
       async function loadData() {
         const relics = await loadRelics();
-        setState(relics);
+        setAllRelics(relics);
       }
       loadData()
     }, [])
-  const autoCompleteOptions = [... state.values()]
-
+  const autoCompleteOptions = [... allRelics.values()]
   return (
     <div>
       <Autocomplete
@@ -239,7 +237,13 @@ function App() {
         sx={{ width: 300 }}
         renderInput={(params) => <TextField {...params} label="Relic" />}
         onChange={(event, values) => {
-          setRelics(values);
+          setRelics(oldData => {
+            const newData = new Map<string, RelicState>();
+            values.forEach(relic => {
+              newData.set(relic.name, oldData.get(relic.name) ?? new RelicState(relic))
+            });
+            return newData;
+          });
           setGatheredData(oldData => {
             const newData = new Map<string, [Item, number][]>();
             values.forEach(relic => {
@@ -249,13 +253,18 @@ function App() {
           })
         }}
       />
-      <RelicTabs relics={relics} changeHandler={(e, r) => {
-        console.log(e,r);
+      <RelicTabs relicStates={[...relics.values()]} changeHandler={(relicState, rewards) => {
         setGatheredData(oldState => {
           const newState = new Map<string, [Item, number][]>(oldState);
-          newState.set(e, r);
+          newState.set(relicState.relic.name, rewards);
           return newState;
         });
+        setRelics(oldData => {
+            console.log(relicState);
+            const newData = new Map<string, RelicState>(oldData);
+            newData.set(relicState.relic.name, relicState);
+            return newData;
+        })
       }} />
       <Recap data={gatheredData} />
     </div>
