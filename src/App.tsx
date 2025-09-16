@@ -1,6 +1,6 @@
 import { JSX, useCallback, useEffect, useState } from 'react'
 import  {Item, loadRelics, Rarity, Relic, RelicReward} from './Types.ts'
-import computeProbabilities from './Math.ts'
+import {computeProbabilities, parseRunMethod, Run} from './Math.ts'
 import './App.css'
 import Autocomplete from '@mui/material/Autocomplete'
 import TextField from '@mui/material/TextField'
@@ -11,6 +11,7 @@ import TabList from '@mui/lab/TabList';
 import TabPanel from '@mui/lab/TabPanel';
 
 import { Button, Checkbox, Input, MenuItem, Paper, Select, SelectChangeEvent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material'
+import RelicState from './RelicState.ts'
 
 function toColor(rarity: Rarity) {
   switch (rarity) {
@@ -31,33 +32,45 @@ class RelicGridProps {
 }
 
 function RelicGrid(props: RelicGridProps) {
-    const [runMethod, setRunMethod] = useState('');
-    const [amount, setAmount] = useState("1");
-    const [positions, setPositions] = useState(new Map(props.relic.rewards.map((r, i) => [r.item.id, i])));
-    const [offcycle, setOffcycle] = useState("");
+    const [state, setState] = useState(new RelicState(props.relic))
     const handleRunChange = (event: SelectChangeEvent) => {
-      setRunMethod(event.target.value as string);
-      if (runMethod.startsWith("4b4")) {
-        setOffcycle("");
-      }
+      setState(old => {
+        const newState = {... old}
+        newState.run = parseRunMethod(event.target.value as string)
+        if (newState.run.nbOffcycleRelicsPerRun() > 0) {
+          newState.offcycle = undefined;
+        }
+        return newState;
+      });
     };
+    const handleOffcycleChange = (event: SelectChangeEvent) => { 
+       setState(old => {
+        const newState = {... old}
+        newState.offcycle = event.target.value as string
+        return newState;
+       });
+    };
+    const handleAmountChange = (event: React.ChangeEvent<HTMLInputElement>) => { setState(old => {
+        const newState = {... old}
+        newState.amount = parseInt(event.target.value);
+        return newState;
+    });}
 
-    const rewards = [...props.relic.rewards].sort((a,b) => (positions.get(a.item.id) ?? 0) - (positions.get(b.item.id) ?? 0))
+    const rewards = [...props.relic.rewards].sort((a,b) => (state.positions.get(a.item.id) ?? 0) - (state.positions.get(b.item.id) ?? 0))
     
-    const probas = runMethod === "" ? undefined : computeProbabilities(runMethod, rewards, offcycle)
+    const probas = state.run === undefined ? undefined : computeProbabilities(state.run, rewards, state.offcycle)
 
     useEffect(() => {
       if (probas !== undefined && props.changeHandler !== undefined) {
-        const parsed = parseInt(amount)
-        if (!Number.isNaN(parsed)) {
-          props.changeHandler(props.relic.name, rewards.map((r, i) => [r.item, probas[i] * parsed]));
+        if (!Number.isNaN(state.amount)) {
+          props.changeHandler(props.relic.name, rewards.map((r, i) => [r.item, probas[i] * (state.amount ?? 1)]));
         }
       }
-    }, [amount, runMethod, positions]);
+    }, [state]);
   
     return (<div>
-        Amount: <TextField value={amount} onChange={(event: React.ChangeEvent<HTMLInputElement>) => { setAmount(event.target.value); }}></TextField>
-        Run method: <Select autoWidth value={runMethod} onChange={handleRunChange}>
+        Amount: <TextField value={state.amount ?? 1} onChange={handleAmountChange}></TextField>
+        Run method: <Select autoWidth value={state.run?.asString() ?? ""} onChange={handleRunChange}>
           <MenuItem value="2b2i">2b2i</MenuItem>
           <MenuItem value="4b4i">4b4i</MenuItem>
           <MenuItem value="2b2f">2b2f</MenuItem>
@@ -65,8 +78,8 @@ function RelicGrid(props: RelicGridProps) {
           <MenuItem value="2b2r">2b2r</MenuItem>
           <MenuItem value="4b4r">4b4r</MenuItem>
         </Select>
-        { !runMethod.startsWith("4b4") &&
-        (<span>Favor offcycle gold before: <Select value={offcycle} onChange={(event: SelectChangeEvent) => { setOffcycle(event.target.value); }} autoWidth>
+        { state.run !== undefined && state.run.nbOffcycleRelicsPerRun() > 0 &&
+        (<span>Favor offcycle gold before: <Select value={state.offcycle ?? ""} onChange={handleOffcycleChange} autoWidth>
           {rewards.map(r => (<MenuItem value={r.item.id}>{r.item.name}</MenuItem>))}
         </Select></span>)}
         <TableContainer component={Paper}>
@@ -89,7 +102,7 @@ function RelicGrid(props: RelicGridProps) {
                   {reward.item.name}
                 </TableCell>
                 <TableCell align="right">{reward.item.set}</TableCell>
-                <TableCell align="right"><TextField  value={positions.get(reward.item.id)} onChange={ createPriorityChangeHandler(reward) }></TextField></TableCell>
+                <TableCell align="right"><TextField  value={state.positions.get(reward.item.id)} onChange={ createPriorityChangeHandler(reward) }></TextField></TableCell>
                 <TableCell align="right">{probas !== undefined && probas[i].toLocaleString(undefined, { maximumFractionDigits: 3 })}</TableCell>
               </TableRow>
             ))}
@@ -104,10 +117,11 @@ function RelicGrid(props: RelicGridProps) {
       if (Number.isNaN(parsed)) {
         return;
       }
-      setPositions((oldValues) => {
-        const newValues = new Map(oldValues);
-        newValues.set(reward.item.id, parsed);
-        return newValues;
+      setState((old) => {
+        const newState = {... old}
+        newState.positions = new Map(newState.positions);
+        newState.positions.set(reward.item.id, parsed);
+        return newState;
       });
     }
   }

@@ -4,9 +4,9 @@ import  { Rarity, RelicReward} from './Types.ts'
 
 
 enum Refinement {
-    Intact="Intact",
-    Flawless="Flawless",
-    Radiant="Radiant",
+    Intact="intact",
+    Flawless="flawless",
+    Radiant="radiant",
 }
 
 enum RunType {
@@ -20,8 +20,22 @@ class RunMethod {
 }
 
 class Run {
-    refinement: Refinement
-    runMethod: RunMethod
+    refinement: Refinement;
+    runMethod: RunMethod;
+
+    constructor(refinement: Refinement, runMethod: RunMethod) {
+        this.refinement = refinement;
+        this.runMethod = runMethod;
+    }
+
+    asString() : string {
+        const result = `${this.runMethod.relicsPerRun}b${this.runMethod.relicsPerRun}${this.refinement[0]}`
+        return result;
+    }
+
+    nbOffcycleRelicsPerRun() {
+        return 4 - this.runMethod.relicsPerRun;
+    }
 }
 
 
@@ -61,13 +75,15 @@ function parseRunMethod(runMethod: string): Run {
     if( refinement === undefined || method === undefined) {
         throw runMethod;
     }
-    return {refinement: refinement, runMethod: method}
+    const result = new Run(refinement, method);
+    if (runMethod !== result.asString()) {
+        console.error("Bad parsing", result, result.asString(), runMethod);
+    }
+    return result;
 }
 
 
-function computeProbabilities(runMethod: string, rewards: RelicReward[], offcycle: string): number[] {
-    console.log("offycle", offcycle);
-    const run = parseRunMethod(runMethod);
+function computeProbabilities(run: Run, rewards: RelicReward[], offcycle: string | undefined): number[] {
     const proba = probabilities.get(run.refinement);
     if (proba === undefined) {
         console.log("Undefined refinement", run.refinement);
@@ -79,18 +95,17 @@ function computeProbabilities(runMethod: string, rewards: RelicReward[], offcycl
     let handleOffcycle = false;
     for (let i=0; i<rewards.length; i++) {
         handleOffcycle = handleOffcycle || (offcycle === rewards[i].item.id);
-        console.log("reward", rewards[i].item.id, handleOffcycle);
         const singleProbability = proba.get(rewards[i].rarity);
         if (singleProbability === undefined) {
             console.log("Undefined proba", proba, rewards[i].rarity);
             throw "Error";
         }
         const compositeProbability = 1-(1-singleProbability - cumulatedProba)**run.runMethod.relicsPerRun - cumulatedCompositeProba;
-        result.push(compositeProbability*(handleOffcycle ? 0.98*0.98 : 1));
+        result.push(compositeProbability*(handleOffcycle ? 0.98**run.nbOffcycleRelicsPerRun() : 1));
         cumulatedProba += singleProbability;
         cumulatedCompositeProba += compositeProbability;
     }  
     return result.map(n => n * run.runMethod.runsPerCycle)
 }
 
-export default computeProbabilities
+export {computeProbabilities, Run, parseRunMethod}
