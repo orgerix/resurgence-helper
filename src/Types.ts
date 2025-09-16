@@ -65,7 +65,7 @@ class DataParser {
         }
     }
 
-    parseItem(item) : Item  {
+    parseItem(item: any) : Item  {
         return new Item(item.name);
     }
 
@@ -79,7 +79,7 @@ class DataParser {
         }
     }
 
-    parseRelic(element) : Relic | undefined {
+    parseRelic(element: any) : Relic | undefined {
         const era = this.parseEra(element.name);
         if (era === undefined) {
             return undefined;
@@ -94,9 +94,9 @@ class DataParser {
         return {name:name, era:era, rewards:rewards}
     }
 
-    parse(data) : Map<string, Relic> {
+    parse(data: any) : Map<string, Relic> {
         const result = new Map<string, Relic>();
-        data.forEach(element => {
+        data.forEach((element: any) => {
             const relic = this.parseRelic(element);
             if (relic !== undefined) {
                 result.set(relic.name, relic);
