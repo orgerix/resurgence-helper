@@ -96,7 +96,8 @@ class DataParser {
 
     parse(data: any) : Map<string, Relic> {
         const result = new Map<string, Relic>();
-        data.forEach((element: any) => {
+        data.filter(elem => elem.name.includes("Intact")).forEach((element: any) => {
+            console.log(element);
             const relic = this.parseRelic(element);
             if (relic !== undefined) {
                 result.set(relic.name, relic);
