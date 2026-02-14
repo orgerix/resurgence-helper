@@ -9,6 +9,7 @@ enum Era {
     Meso="Meso",
     Neo="Neo",
     Axi="Axi",
+    Vanguard="Vanguard",
 }
 
 class RelicReward {
@@ -50,8 +51,8 @@ class Relic {
 
 class DataParser {
 
-    parseEra(relicName: string): Era | undefined {
-        switch (relicName.substring(0, relicName.indexOf(" "))) {
+    parseEra(tier: string): Era  {
+        switch (tier) {
             case "Lith":
                 return Era.Lith;
             case "Meso":
@@ -59,14 +60,12 @@ class DataParser {
             case "Neo":
                 return Era.Neo;
             case "Axi":
-                return Era.Axi
+                return Era.Axi;
+            case "Vanguard":
+                return Era.Vanguard
             default:
-                return undefined;
+                throw "Invalid era " + tier;
         }
-    }
-
-    parseItem(item: any) : Item  {
-        return new Item(item.name);
     }
 
     getRarity(chance:number) : Rarity {
@@ -79,16 +78,12 @@ class DataParser {
         }
     }
 
-    parseRelic(element: any) : Relic | undefined {
-        const era = this.parseEra(element.name);
-        if (era === undefined) {
-            return undefined;
-        }
-        const chunks = element.name.split(" ");
-        const name = chunks[0] + " " + chunks[1];
+    parseRelic(element: any) : Relic {
+        const era = this.parseEra(element.tier);
+        const name = element.tier + " " + element.relicName;
         const rewards = element.rewards.map(r => {
             const rarity = this.getRarity(r.chance);
-            const item = this.parseItem(r.item);
+            const item = new Item(r.itemName);
             return {rarity:rarity, item:item};
         })  
         return {name:name, era:era, rewards:rewards}
@@ -96,19 +91,16 @@ class DataParser {
 
     parse(data: any) : Map<string, Relic> {
         const result = new Map<string, Relic>();
-        data.filter(elem => elem.name.includes("Intact")).forEach((element: any) => {
-            console.log(element);
+        data.relics.filter(elem => elem.state === "Intact" && elem.tier !== "Requiem").forEach((element: any) => {
             const relic = this.parseRelic(element);
-            if (relic !== undefined) {
-                result.set(relic.name, relic);
-            }
+            result.set(relic.name, relic);
         });
         return result;
     }
 }
 
 async  function loadRelics(): Promise<Map<string, Relic>> {
-    const response = await fetch("https://api.warframestat.us/items/search/Relics/?by=category&language=en")
+    const response = await fetch("https://drops.warframestat.us/data/relics.json")
     const json = await response.json();
     return new DataParser().parse(json);
 }
