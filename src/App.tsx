@@ -326,8 +326,19 @@ function App() {
   )
   useEffect(() => {
     async function loadData() {
-      const relics = await loadRelics()
-      setAllRelics(relics)
+      try {
+        const allRelics = await loadRelics()
+        setAllRelics(allRelics)
+        const encoded = decodeFromURL()
+        if (encoded) {
+          const restored = deserialize(encoded, allRelics)
+          if (restored && restored.size > 0) {
+            setRelics(restored)
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load state:', e)
+      }
     }
     loadData()
   }, [])
