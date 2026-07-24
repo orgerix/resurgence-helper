@@ -1,5 +1,5 @@
-import { JSX, useCallback, useEffect, useState } from 'react'
-import { Item, loadRelics, Rarity, Relic, RelicReward } from './Types.ts'
+import { JSX, useEffect, useRef, useState } from 'react'
+import { Item, loadRelics, Rarity, Relic } from './Types.ts'
 import { computeProbabilities, parseRunMethod, Run } from './Math.ts'
 import Autocomplete from '@mui/material/Autocomplete'
 import TextField from '@mui/material/TextField'
@@ -12,9 +12,6 @@ import { ThemeProvider } from '@mui/material'
 import { createTheme } from '@mui/material'
 
 import {
-  Button,
-  Checkbox,
-  Input,
   MenuItem,
   Paper,
   Select,
@@ -54,6 +51,9 @@ class RelicGridProps {
 
 function RelicGrid(props: RelicGridProps) {
   const [state, setState] = useState(props.relicState)
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const currentDropIndex = useRef<number | null>(null)
+  const currentDraggedIndex = useRef<number | null>(null)
   const handleRunChange = (event: SelectChangeEvent) => {
     setState((old) => {
       const newState = { ...old }
@@ -77,6 +77,42 @@ function RelicGrid(props: RelicGridProps) {
       newState.amount = parseInt(event.target.value)
       return newState
     })
+  }
+
+  const handleDragStart = (index: number, event: React.DragEvent) => {
+    // Hide the browser's default drag ghost since rows move live during the drag
+    const emptyImg = new Image()
+    emptyImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+    event.dataTransfer.setDragImage(emptyImg, 0, 0)
+    currentDropIndex.current = index
+    currentDraggedIndex.current = index
+    setDraggedIndex(index)
+  }
+
+  const handleDragOver = (index: number, event: React.DragEvent) => {
+    event.preventDefault()
+    if (currentDropIndex.current === null || currentDropIndex.current === index) return
+    const from = currentDropIndex.current
+    currentDropIndex.current = index
+    setState((old) => {
+      const newState = { ...old }
+      const newRewards = [...rewards]
+      const [moved] = newRewards.splice(from, 1)
+      newRewards.splice(index, 0, moved)
+      newState.positions = new Map(
+        newRewards.map((r, i) => [r.item.id, i])
+      )
+      return newState
+    })
+    const newDraggedIndex = index
+    currentDraggedIndex.current = newDraggedIndex
+    setDraggedIndex(newDraggedIndex)
+  }
+
+  const handleDrop = () => {
+    currentDropIndex.current = null
+    currentDraggedIndex.current = null
+    setDraggedIndex(null)
   }
 
   const rewards = [...props.relicState.relic.rewards].sort(
@@ -141,31 +177,36 @@ function RelicGrid(props: RelicGridProps) {
             <TableRow>
               <TableCell>Item</TableCell>
               <TableCell align='right'>Set</TableCell>
-              <TableCell align='right'>Priorty</TableCell>
               <TableCell align='right'>Expected Reward</TableCell>
+              <TableCell align='right'></TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {rewards.map((reward, i) => (
               <TableRow
                 key={reward.item.id}
-                sx={{ backgroundColor: toColor(reward.rarity) }}
+                sx={{
+                  backgroundColor: toColor(reward.rarity),
+                  opacity: draggedIndex !== null && draggedIndex === i ? 0.3 : 1,
+                  cursor: 'grab',
+                }}
+                draggable
+                onDragStart={(e) => handleDragStart(i, e)}
+                onDragOver={(e) => handleDragOver(i, e)}
+                onDrop={handleDrop}
               >
                 <TableCell component='th' scope='row'>
                   {reward.item.name}
                 </TableCell>
                 <TableCell align='right'>{reward.item.set}</TableCell>
                 <TableCell align='right'>
-                  <TextField
-                    value={state.positions.get(reward.item.id)}
-                    onChange={createPriorityChangeHandler(reward)}
-                  ></TextField>
-                </TableCell>
-                <TableCell align='right'>
                   {probas !== undefined &&
                     probas[i].toLocaleString(undefined, {
                       maximumFractionDigits: 3,
                     })}
+                </TableCell>
+                <TableCell align='right' sx={{ cursor: 'grab' }}>
+                  ⠿
                 </TableCell>
               </TableRow>
             ))}
@@ -174,21 +215,6 @@ function RelicGrid(props: RelicGridProps) {
       </TableContainer>
     </div>
   )
-
-  function createPriorityChangeHandler(reward: RelicReward) {
-    return (event) => {
-      const parsed = parseInt(event.target.value)
-      if (Number.isNaN(parsed)) {
-        return
-      }
-      setState((old) => {
-        const newState = { ...old }
-        newState.positions = new Map(newState.positions)
-        newState.positions.set(reward.item.id, parsed)
-        return newState
-      })
-    }
-  }
 }
 
 class RelicTabsProps {
