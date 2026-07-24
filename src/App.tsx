@@ -12,6 +12,7 @@ import { ThemeProvider } from '@mui/material'
 import { createTheme } from '@mui/material'
 
 import {
+  Button,
   MenuItem,
   Paper,
   Select,
@@ -24,6 +25,7 @@ import {
   TableRow,
 } from '@mui/material'
 import RelicState from './RelicState.ts'
+import { decodeFromURL, deserialize, serialize } from './Permalink.ts'
 
 const darkTheme = createTheme({
   palette: {
@@ -333,13 +335,15 @@ function App() {
   return (
     <ThemeProvider theme={darkTheme}>
       <div>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: 300 }}>
         <Autocomplete
           disablePortal
           multiple
           options={autoCompleteOptions}
+          value={[...relics.values()].map((s) => s.relic)}
           getOptionLabel={(option) => option.name}
           groupBy={(option) => option.era.toString()}
-          sx={{ width: 300 }}
+          sx={{ flexGrow: 1 }}
           renderInput={(params) => <TextField {...params} label='Relic' />}
           onChange={(event, values) => {
             setRelics((oldData) => {
@@ -361,6 +365,18 @@ function App() {
             })
           }}
         />
+        <Button
+          variant='contained'
+          disabled={relics.size === 0}
+          onClick={() => {
+            const url = new URL(window.location.href)
+            url.searchParams.set('state', serialize(relics))
+            navigator.clipboard.writeText(url.toString())
+          }}
+        >
+          Share
+        </Button>
+        </Box>
 
         <RelicTabs
           relicStates={[...relics.values()]}
@@ -371,7 +387,6 @@ function App() {
               return newState
             })
             setRelics((oldData) => {
-              console.log(relicState)
               const newData = new Map<string, RelicState>(oldData)
               newData.set(relicState.relic.name, relicState)
               return newData
