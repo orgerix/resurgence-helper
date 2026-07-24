@@ -115,6 +115,12 @@ function RelicGrid(props: RelicGridProps) {
     setDraggedIndex(null)
   }
 
+  const handleDragEnd = () => {
+    currentDropIndex.current = null
+    currentDraggedIndex.current = null
+    setDraggedIndex(null)
+  }
+
   const rewards = [...props.relicState.relic.rewards].sort(
     (a, b) =>
       (state.positions.get(a.item.id) ?? 0) -
@@ -194,6 +200,7 @@ function RelicGrid(props: RelicGridProps) {
                 onDragStart={(e) => handleDragStart(i, e)}
                 onDragOver={(e) => handleDragOver(i, e)}
                 onDrop={handleDrop}
+                onDragEnd={handleDragEnd}
               >
                 <TableCell component='th' scope='row'>
                   {reward.item.name}
