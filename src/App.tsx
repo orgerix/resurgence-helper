@@ -109,12 +109,6 @@ function RelicGrid(props: RelicGridProps) {
     setDraggedIndex(newDraggedIndex)
   }
 
-  const handleDrop = () => {
-    currentDropIndex.current = null
-    currentDraggedIndex.current = null
-    setDraggedIndex(null)
-  }
-
   const handleDragEnd = () => {
     currentDropIndex.current = null
     currentDraggedIndex.current = null
@@ -199,7 +193,6 @@ function RelicGrid(props: RelicGridProps) {
                 draggable
                 onDragStart={(e) => handleDragStart(i, e)}
                 onDragOver={(e) => handleDragOver(i, e)}
-                onDrop={handleDrop}
                 onDragEnd={handleDragEnd}
               >
                 <TableCell component='th' scope='row'>
