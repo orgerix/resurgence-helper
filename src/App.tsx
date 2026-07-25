@@ -346,6 +346,7 @@ function App() {
   return (
     <ThemeProvider theme={darkTheme}>
       <div>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: 300 }}>
         <Autocomplete
           disablePortal
@@ -376,6 +377,7 @@ function App() {
             })
           }}
         />
+        </Box>
         <Button
           variant='contained'
           disabled={relics.size === 0}
